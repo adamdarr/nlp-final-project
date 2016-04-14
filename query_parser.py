@@ -11,7 +11,6 @@ def parseQuery(raw_query):
 	master_chunk = r"Chunk: {(<VB\w?>|<JJ>*|<RB\w?>)<DT>?(<NN\w?>+)}" # Regex to identify chunks that may be useful
 	master_parser = nltk.RegexpParser(master_chunk) # Create the parser from the Regex
 	master = master_parser.parse(tagged_query) # Parse the query previously tagged
-	print(master)
 	
 	keyword_list = []
 	for itm in master:
