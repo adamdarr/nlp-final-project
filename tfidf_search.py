@@ -13,7 +13,7 @@ REVIEW_FILE = ('/Users/adam/Downloads/yelp_dataset_challenge_' +
                'academic_dataset/yelp_academic_dataset_review.json')
 
 # Specifies the amount of reviews to be read from the beginning of the file
-REVIEWS_TO_READ = 50000
+REVIEWS_TO_READ = 20000
 
 # Specifies the number of results to be returned
 NUM_RESULTS = 20
@@ -92,6 +92,60 @@ class DocInfo:
 
         return answer
 
+    def positional_intersect(self, w1, w2, k):
+        if w1 in self.index_counts and w2 in self.index_counts:
+            p1 = self.index_counts[w1].postings_list
+            p2 = self.index_counts[w2].postings_list
+        else:
+            return {}
+
+        t1 = copy.copy(p1)
+        t2 = copy.copy(p2)
+
+        answer = {}
+        while len(p1) != 0 and len(p2) != 0:
+            doc_id1 = p1[0]
+            doc_id2 = p2[0]
+
+            if doc_id1 == doc_id2:
+                l = []
+                pp1 = self.index_counts[w1].doc_positions[doc_id1]
+                pp2 = self.index_counts[w2].doc_positions[doc_id2]
+
+                pp1_idx = 0
+                pp2_idx = 0
+
+                while pp1_idx < len(pp1):
+                    if abs(pp1[pp1_idx] - pp2[pp2_idx]) < k:
+                        l.append(pp2[0])
+                    elif pp2[pp2_idx] > pp1[pp1_idx]:
+                        break
+
+                    pp2_idx += 1
+
+                    while len(l) != 0 and (l[0] - pp1[pp1_idx]) > k:
+                        l.pop(0)
+
+                    for pos in l:
+                        answer[doc_id1] = pp1[pp1_idx], pos
+
+                    pp1_idx += 1
+
+                    if pp2_idx >= len(pp2):
+                        break
+
+                p1.popleft()
+                p2.popleft()
+            elif doc_id1 < doc_id2:
+                p1.popleft()
+            else:
+                p2.popleft()
+
+        self.index_counts[w1].postings_list = t1
+        self.index_counts[w2].postings_list = t2
+
+        return answer
+
     def tf(self, term, doc_id):
         if term in self.index_counts and doc_id in self.index_counts[term].doc_positions:
             doc_positions = self.index_counts[term].doc_positions[doc_id]
@@ -156,6 +210,27 @@ def main():
         query = raw_input("Please enter your search query: ")
         query_tokens = query.lower().split(' ')
 
+        if len(query_tokens) > 1:
+            intersections = []
+            for i in range(len(query_tokens) - 1):
+                intersection = doc_info.positional_intersect(query_tokens[i], query_tokens[i+1], 2)
+                intersections.append(intersection)
+
+            for i in range(len(query_tokens) - 1):
+                if i == 0:
+                    keys_intersections = set(intersections[i].keys())
+                else:
+                    keys_intersections = keys_intersections & set(intersections[i].keys())
+
+            s = ''
+            for key in keys_intersections:
+                s += doc_info.business_id[key] + ', '
+
+            if s != '':
+                print 'Exact matches: %s' % s
+            else:
+                print 'No exact matches.'
+
         query_tfidfs = {}
         for i in range(len(docs)):
             query_tfidfs[i] = 0
@@ -173,5 +248,12 @@ def main():
             count += 1
 
         print '-----------------------------------------------\n'
+
+def test():
+    doc_info = DocInfo()
+    doc_info.add_entries(1, 1, ['the', 'bride', 'to', 'be', 'to', 'be'])
+    doc_info.add_entries(2, 2, ['to', 'be'])
+
+    print(doc_info.positional_intersect('to', 'be', 2))
 
 if __name__ == "__main__": main()
